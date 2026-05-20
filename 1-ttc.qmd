@@ -98,7 +98,7 @@ Each row contains a short text description (`label`) and the corresponding NAF c
 
 ### Question 1 — Import libraries and load environment variables
 
-Import `os` and use `load_dotenv(override=True)` from the `dotenv` package to load your `.env` file.
+Import `os` the `load_dotenv` from the `dotenv` package. Then execute `load_dotenv(override=True)` to load your `.env` file.
 ```{python}
 #| label: setup
 #| code-fold: true
@@ -118,9 +118,12 @@ Use Polars to load the parquet file directly from this public URL:
 https://minio.lab.sspcloud.fr/projet-formation/diffusion/funathon/2026/project2/generation_None_temp08.parquet
 ```
 
-Print the first rows and the total number of observations.
+Print the first rows and the total number of observations. Do you understand all columns?
 
-*Use `pl.read_parquet(url)`, `.head()`, and `len(df)`.*
+<details>
+<summary>Clue here</summary>
+You may use the function `pl.read_parquet()`, and the methods `.head()`, and `len(df)`.
+</details>
 ```{python}
 #| label: load-data
 #| code-fold: true
@@ -139,7 +142,10 @@ print(f"Total rows: {len(df)}")
 
 How many unique NAF codes are present in the dataset? This number will define the number of output classes the model must predict.
 
-*Use `.n_unique()` on the `code` column.*
+<details>
+<summary>Clue here</summary>
+The `.n_unique()` method in Polars may help you computing the number of classes.
+</details>
 ```{python}
 #| label: unique-codes
 #| code-fold: true
@@ -149,11 +155,6 @@ How many unique NAF codes are present in the dataset? This number will define th
 n_classes = df['code'].n_unique()
 print(f"Number of unique NAF codes: {n_classes}")
 ```
-
-<details>
-<summary>Clue here</summary>
-Use the `.n_unique()` method on the `code` column: `df['code'].n_unique()`.
-</details>
 
 :::
 
