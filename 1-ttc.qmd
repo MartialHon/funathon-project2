@@ -96,7 +96,7 @@ Each row contains a short text description (`label`) and the corresponding NAF c
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 1: Load the labelled dataset
 
-### Question 1 — Import libraries and load environment variables
+## Question 1 — Import libraries and load environment variables
 
 Import `os` the `load_dotenv` from the `dotenv` package. Then execute `load_dotenv(override=True)` to load your `.env` file.
 ```{python}
@@ -110,7 +110,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 ```
 
-### Question 2 — Load the dataset from MinIO
+## Question 2 — Load the dataset from MinIO
 
 Use Polars to load the parquet file directly from this public URL:
 
@@ -138,7 +138,7 @@ print(df.head())
 print(f"Total rows: {len(df)}")
 ```
 
-### Question 3 — Count unique NAF codes
+## Question 3 — Count unique NAF codes
 
 How many unique NAF codes are present in the dataset? This number will define the number of output classes the model must predict.
 
@@ -178,7 +178,7 @@ final evaluation is truly unbiased.
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 2: Split the dataset into train / validation / test sets
 
-### Question 1 — Write a split function
+## Question 1 — Write a split function
 
 Write a function `train_val_test_split` that shuffles the DataFrame and returns three
 non-overlapping splits according to provided fractions.
@@ -205,7 +205,7 @@ def train_val_test_split(
     return train, val, test
 ```
 
-### Question 2 — Apply the split and encode labels
+## Question 2 — Apply the split and encode labels
 
 Apply the function and extract the `label` (features) and `code` (target) columns for each
 split as numpy arrays. Encode the string codes to integers with `LabelEncoder` — keep the
@@ -269,7 +269,7 @@ domain-specific text like French business descriptions.
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 3: Train a WordPiece tokenizer
 
-### Question 1 — Train the tokenizer and inspect a sample
+## Question 1 — Train the tokenizer and inspect a sample
 
 Train a `WordPieceTokenizer` from scratch on the training labels with `vocab_size=5000`
 and `output_dim=125`. Inspect a sample tokenization to understand how the text is split.
@@ -339,7 +339,7 @@ Key training hyperparameters:
 `torchTextClassifiers` provides a high-level wrapper that combines the tokenizer, model
 components, and training loop.
 
-### Question 1 — Instantiate the classifier
+## Question 1 — Instantiate the classifier
 
 Instantiate the classifier from a `ModelConfig` and the trained tokenizer.
 
@@ -378,7 +378,7 @@ model_config = ModelConfig(
 ttc = torchTextClassifiers(tokenizer=tokenizer, model_config=model_config)
 ```
 
-### Question 2 — Train on a small subsample
+## Question 2 — Train on a small subsample
 
 Define a `TrainingConfig` and train on a small subsample so it completes quickly.
 
@@ -429,7 +429,7 @@ ttc.train(
 )
 ```
 
-### Question 3 — Load the pretrained model from MLflow
+## Question 3 — Load the pretrained model from MLflow
 
 Load the **pretrained model** trained on the full dataset from MLflow.
 
@@ -521,7 +521,7 @@ prediction. Use these visualisations as an exploratory tool, not as a ground-tru
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 5: Generate predictions and inspect attributions
 
-### Question 1 — Generate top-3 predictions with confidence scores
+## Question 1 — Generate top-3 predictions with confidence scores
 
 Call `ttc_full.predict(np.array(example_texts), top_k=3, explain_with_label_attention=True)`. The result is a dict with keys `prediction` and `confidence` — decode integer predictions back to NAF codes using `saved_label_mapping[str(idx)]`.
 
@@ -551,7 +551,7 @@ for i, text in enumerate(example_texts):
         print(f"  {code}  (confidence: {conf:.3f})")
 ```
 
-### Question 2 — Visualise word attributions for the top prediction
+## Question 2 — Visualise word attributions for the top prediction
 
 Extract `label_attention_attributions` from the results, average over attention heads, then use `map_attributions_to_word()`, `map_attributions_to_char()`, `plot_attributions_at_word()`, and `plot_attributions_at_char()` from `torchTextClassifiers.utilities.plot_explainability`.
 
@@ -601,7 +601,7 @@ figshow(plot_attributions_at_word(
 )[0])
 ```
 
-### Question 3 — Evaluate accuracy on the test set
+## Question 3 — Evaluate accuracy on the test set
 
 Run `ttc_full.predict(X_test_small, top_k=1)` and compare the predictions against `y_test_small` to compute accuracy.
 
