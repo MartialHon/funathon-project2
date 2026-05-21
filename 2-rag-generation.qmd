@@ -961,3 +961,38 @@ n_correct = (
 
 
 :::
+---
+
+# What you learned — and how to go further
+
+## Key concepts of the RAG approach
+
+Across the two RAG tutorials you built a complete pipeline from raw text to a coded NACE label:
+
+- **Vector database (tutorial 1)**: NACE definitions were cleaned, embedded with a dense model, and stored in Qdrant as `PointStruct` objects with deterministic UUIDs. The choice of embedding model and the richness of the stored text (includes, excludes) directly shape retrieval quality.
+- **Semantic retrieval**: at inference time, the activity label is embedded with the *same* model and the `k` nearest neighbours are fetched from Qdrant. Retriever@k is the hard ceiling of the pipeline — if the correct code is not retrieved, the LLM cannot recover it.
+- **Structured generation**: the retrieved candidates are injected into a prompt and the LLM is asked to pick one, returning a typed `NaceClassificationResult` object via `beta.chat.completions.parse()`. Pydantic constraints catch malformed responses at parse time.
+- **Decomposed evaluation**: pipeline accuracy factors as Retriever@k × LLM accuracy (conditional). This decomposition pinpoints *where* errors occur and guides improvements.
+- **Confidence-based triage**: the LLM confidence score enables a precision/coverage trade-off — high-confidence predictions are sent to automatic coding, low-confidence ones to human review.
+
+## What to try next
+
+### Improve the retriever
+- **Larger or domain-adapted embedding model**: a model fine-tuned on economic activity descriptions would produce better semantic clusters than a general-purpose one.
+- **Hybrid search**: combine dense (embedding) and sparse (BM25 keyword) search. Qdrant supports this natively. Useful when the activity label contains exact NACE terminology.
+- **Increase k and rerank**: retrieve more candidates (e.g. `k=10`) and add a lightweight cross-encoder reranker to re-score them before passing the top-5 to the LLM. Rerankers are better at fine-grained relevance but too slow to run over the full collection.
+
+### Improve the generator
+- **Few-shot examples in the prompt**: add 2–3 labelled examples (activity → code) to the user prompt. This helps the LLM calibrate on the expected granularity of the nomenclature.
+- **Chain-of-thought**: ask the LLM to reason step-by-step before outputting the JSON. Adds latency but can improve accuracy on ambiguous labels.
+- **More capable model**: swap `GEN_MODEL_NAME` for a larger or instruction-tuned model — generation errors are usually the cheaper component to improve.
+
+### Better evaluation
+- **Hierarchical accuracy**: count a prediction as partially correct if it matches the true code at the section or division level (e.g. `47` matches `47.11`). This is more informative than strict exact-match for a 4-level hierarchy.
+- **Larger evaluation set**: `SAMPLE_SIZE = 100` gives noisy estimates. Run on the full dataset or use bootstrap confidence intervals.
+- **Error analysis by sector**: accuracy may vary widely across NACE sections. Identifying weak sectors guides targeted improvements.
+
+### Production considerations
+- **Caching embeddings**: if the same activity labels recur (e.g. standard job titles), cache their embeddings to avoid redundant API calls.
+- **Async batching**: parallelise the embedding + generation calls with `asyncio` to reduce wall-clock time on large batches.
+- **Human-in-the-loop**: route low-confidence predictions (`confidence < t`) to a review queue rather than discarding them — combine automatic coding with human validation to maximise both precision and coverage.
