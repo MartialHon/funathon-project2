@@ -49,19 +49,46 @@ flowchart LR
 
 ## Before you start
 
-Make sure your environment is ready:
+Three things need to be in place before running any cell.
 
-- **Packages**: all dependencies are declared in `pyproject.toml`. Run `uv sync` to install them.
-- **Environment variables**: create a `.env` file at the root of the project with the following variables:
-  ```
-  MLFLOW_TRACKING_URI=<add the MLflow server URL>
-  MLFLOW_RUN_ID=<add the run ID>
-  ```
-- **torchtextclassifiers**: this notebook relies on the [`torchtextclassifiers`](https://github.com/InseeFrLab/torchTextClassifiers) library developped by INSEE. Refer to its GitHub for full API documentation.
+**1. Install the dependencies**
+
+All required packages are listed in `pyproject.toml`. Run the following command once at the root of the project to install them into a virtual environment:
+
+```bash
+uv sync
+```
+
+This installs, among others, `torchTextClassifiers` — the INSEE library that provides the tokenizer, model, and training loop used throughout this notebook. Its full API documentation is available [here](https://inseefrlab.github.io/torchTextClassifiers/).
+
+**2. Understand what MLflow is and why we need it**
+
+In this notebook, we use MLflow in two ways:
+
+- During training (Exercise 4), metrics are logged to a remote MLflow server so you can monitor progress.
+- After training (Exercise 4, Question 3), we **download a pretrained model** that was already trained on the full dataset and stored in MLflow, so you do not have to wait hours for training to complete.
+
+**2. Set up your MLflow credentials**
+
+[MLflow](https://mlflow.org/) is an open-source platform for tracking machine learning experiments. Every time a model is trained, MLflow records the hyperparameters used, the metrics obtained (loss, accuracy…), and the model artefacts (weights, tokenizer, configuration). This makes it easy to compare runs, reproduce results, and share trained models with others. This funathon project uses MLflow in multiple ways.
+
+Because the MLflow server is a remote, access-controlled service, you need to provide two pieces of information:
+
+- `MLFLOW_TRACKING_URI`: the URL of the MLflow server (tells your code where to connect).
+- `MLFLOW_RUN_ID`: the identifier of the specific training run whose artefacts (pretrained model) you want to download.
+
+These values must **not** be hardcoded in the notebook — storing credentials in source code is a security risk. Instead, create a file named `.env` at the root of the project and fill it in as follows:
+
+```
+MLFLOW_TRACKING_URI=<add the MLflow server URL>
+MLFLOW_RUN_ID=<add the run ID>
+```
+
+The notebook loads this file automatically at startup with `load_dotenv()`, making the values available as environment variables without ever appearing in the code.
 
 ---
 
-# Load data
+# Load the data
 
 The dataset consists of **synthetic labelled examples** generated for the NAF 2025 nomenclature.
 Each row contains a short text description (`label`) and the corresponding NAF code (`code`).
@@ -69,9 +96,9 @@ Each row contains a short text description (`label`) and the corresponding NAF c
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 1: Load the labelled dataset
 
-### Question 1 — Import libraries and load environment variables
+## Question 1 — Import libraries and load environment variables
 
-Import `os` and use `load_dotenv(override=True)` from the `dotenv` package to load your `.env` file.
+Import `os` the `load_dotenv` from the `dotenv` package. Then execute `load_dotenv(override=True)` to load your `.env` file.
 ```{python}
 #| label: setup
 #| code-fold: true
@@ -83,7 +110,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 ```
 
-### Question 2 — Load the dataset from MinIO
+## Question 2 — Load the dataset from s3
 
 Use Polars to load the parquet file directly from this public URL:
 
@@ -91,9 +118,13 @@ Use Polars to load the parquet file directly from this public URL:
 https://minio.lab.sspcloud.fr/projet-formation/diffusion/funathon/2026/project2/generation_None_temp08.parquet
 ```
 
-Print the first rows and the total number of observations.
+Print the first rows and the total number of observations. Do you understand all columns?
 
-*Use `pl.read_parquet(url)`, `.head()`, and `len(df)`.*
+<details>
+<summary>Clue here</summary>
+You may use the functions `pl.read_parquet()` and `len()`, and the method `.head()`.
+</details>
+
 ```{python}
 #| label: load-data
 #| code-fold: true
@@ -108,11 +139,16 @@ print(df.head())
 print(f"Total rows: {len(df)}")
 ```
 
-### Question 3 — Count unique NAF codes
+
+## Question 3 — Count unique NAF codes
 
 How many unique NAF codes are present in the dataset? This number will define the number of output classes the model must predict.
 
-*Use `.n_unique()` on the `code` column.*
+<details>
+<summary>Clue here</summary>
+The `.n_unique()` method in Polars may help you computing the number of classes.
+</details>
+
 ```{python}
 #| label: unique-codes
 #| code-fold: true
@@ -122,11 +158,6 @@ How many unique NAF codes are present in the dataset? This number will define th
 n_classes = df['code'].n_unique()
 print(f"Number of unique NAF codes: {n_classes}")
 ```
-
-<details>
-<summary>Clue here</summary>
-Use the `.n_unique()` method on the `code` column: `df['code'].n_unique()`.
-</details>
 
 :::
 
@@ -150,38 +181,31 @@ final evaluation is truly unbiased.
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 2: Split the dataset into train / validation / test sets
 
-### Question 1 — Write a split function
+## Question 1 — Split the dataset
 
-Write a function `train_val_test_split` that shuffles the DataFrame and returns three
-non-overlapping splits according to provided fractions. The parameters are: `df` the DataFrame, `train_frac` the fraction of rows assigned to the training set, `val_frac` the fraction of rows assigned to the validation set and `seed` the seed for the random number generator.
+Use `train_test_split` from `sklearn.model_selection` to split the dataset into train, validation, and test sets (70% / 15% / 15%). Do not forget to choose a `random_state`.
 
-*Use `df.sample(fraction=1.0, shuffle=True, seed=seed)` to shuffle, then slice with integer indices.*
+<details>
+<summary>Clue here</summary>
+`train_test_split` splits a dataset in two — call it twice to get three subsets.
+</details>
+
 ```{python}
 #| label: split-fn
 #| code-fold: true
 #| code-summary: Click to see the answer
 #| code-overflow: scroll
-def train_val_test_split(
-    df: pl.DataFrame,
-    train_frac: float = 0.7,
-    val_frac: float = 0.15,
-    seed: int = 42,
-) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
-    df = df.sample(fraction=1.0, shuffle=True, seed=seed)
-    n = len(df)
-    n_train = int(n * train_frac)
-    n_val = int(n * val_frac)
-    train = df[:n_train]
-    val   = df[n_train : n_train + n_val]
-    test  = df[n_train + n_val :]
-    return train, val, test
+from sklearn.model_selection import train_test_split
+
+train_df, tmp_df = train_test_split(df, test_size=0.30, random_state=42)
+val_df, test_df  = train_test_split(tmp_df, test_size=0.50, random_state=42)
+
+X_train = train_df["label"].to_numpy()
+X_val   = val_df["label"].to_numpy()
+X_test  = test_df["label"].to_numpy()
+
+print(f"Train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
 ```
-
-### Question 2 — Apply the split and encode labels
-
-Apply the function and extract the `label` (features) and `code` (target) columns for each
-split as numpy arrays. Encode the string codes to integers with `LabelEncoder` — keep the
-fitted encoder to decode predictions back to NAF codes later.
 
 *Use `LabelEncoder` from `sklearn.preprocessing` (see [here](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html) for the documentation). Call `.fit()` on all codes, then `.transform()` on each split. Extract numpy arrays with `.to_numpy()`.*
 
@@ -191,11 +215,11 @@ We use `LabelEncoder` to map the categorical target `y` to integers `0, 1, …, 
 
 :::
 
-::: {.callout-warning collapse="true"}
-## Watch out for data leakage
-Always fit the `LabelEncoder` on **all** codes (`df['code']`), not just the training set.
-If a code appears only in the validation or test set and the encoder has never seen it,
-`transform()` will raise an error.
+The `code` column contains strings like `"47.11A"`. Neural networks do not understand strings and require integer targets (1, 2, 3...), so we need to map each unique NAF code to an integer index. Encode the `code` column of each split using `LabelEncoder` from `sklearn.preprocessing`, and keep the fitted encoder — you will need it later to convert integer predictions back to NAF code strings.
+
+::: {.callout-warning collapse="false"}
+## Watch out for unseen categories!
+Always fit the `LabelEncoder` on **all** codes present in the data, not just codes present in the training set. Why that? Imagine that one code is very rare and is present only in the validation set or in the test. If the `LabelEncoder` is trained on the training set alone, it will not be able to map this rare code to an integer, and when you apply the `LabelEncoder` to this code (for instance when evaluating the model) you will get an error.
 :::
 
 ```{python}
@@ -206,15 +230,12 @@ If a code appears only in the validation or test set and the encoder has never s
 #| output: true
 from sklearn.preprocessing import LabelEncoder
 
-train, val, test = train_val_test_split(df)
-
-# Fit on all codes so val/test codes are not unknown to the encoder
 encoder = LabelEncoder()
 encoder.fit(df['code'].to_numpy())
 
-X_train, y_train = train['label'].to_numpy(), encoder.transform(train['code'].to_numpy())
-X_val,   y_val   = val['label'].to_numpy(),   encoder.transform(val['code'].to_numpy())
-X_test,  y_test  = test['label'].to_numpy(),  encoder.transform(test['code'].to_numpy())
+y_train = encoder.transform(train_df['code'].to_numpy())
+y_val   = encoder.transform(val_df['code'].to_numpy())
+y_test  = encoder.transform(test_df['code'].to_numpy())
 
 print(f"Train: {len(train)} | Val: {len(val)} | Test: {len(test)}")
 print(f"Example: '{train['label'][0]}' → {encoder.inverse_transform(y_train[:1])[0]}")
@@ -222,34 +243,52 @@ print(f"Example: '{train['label'][0]}' → {encoder.inverse_transform(y_train[:1
 
 :::
 
-# Tokenizer
+# Applying a tokenizer
 
-Neural networks cannot process raw text directly — they work with numbers. A **tokenizer**
-is the component that bridges this gap: it splits a text into small units called **tokens**
-(words, subwords, or characters) and maps each token to a unique integer ID.
+## Why tokenization?
 
-For more details on tokenaziser, you can see the documentation [here](https://inseefrlab.github.io/torchTextClassifiers/architecture/overview.html#component-1-tokenizer)
+Neural networks can only work with numbers because they have no notion of letters or words. A **tokenizer** is the component that bridges this gap: it converts raw text into a sequence of integers that the model can process.
 
-For example, the sentence *"I sell croissants and pains au chocolat"* might be split into tokens
-`["i", "sell'", "croissants", "and", "pains", "au", "chocolat"]` and encoded as `[326, 40, 199, 126, 20, 755, 1024]`.
+The process has three steps:
 
-The sequence of IDs is then padded or truncated to a fixed length (`output_dim`) so that
-all inputs have the same shape, which is required for batched training.
+1. **Split** the text into small units called **tokens**: these can be whole words, subword fragments, or individual characters.
+2. **Map** each token to a unique integer using a fixed vocabulary (a lookup table built during training).
+3. **Pad or truncate** the resulting sequence to a fixed length so that all inputs have the same shape, which is required for batched training.
+
+The diagram below illustrates this pipeline on a short example:
+
+```mermaid
+flowchart LR
+    A["\"I sell croissants\""] -->|"split into tokens"| B["[\"i\", \"sell\", \"croi\", \"##ssants\"]"]
+    B -->|"look up in vocabulary"| C["[45, 112, 87, 203]"]
+    C -->|"pad to length 6"| D["[45, 112, 87, 203, 0, 0]"]
+```
+
+## Why subword tokenization?
+
+There are several ways to split text into tokens: by character, by full word, or by subword fragment. Each has trade-offs:
+
+| Strategy | Example for *"croissants"* | Problem |
+|---|---|---|
+| Character-level | `["c","r","o","i","s","s","a","n","t","s"]` | Sequences become very long; meaning is hard to capture |
+| Word-level | `["croissants"]` | Rare or misspelled words get mapped to `[UNKNOWN]` |
+| **Subword (WordPiece)** | `["croi", "##ssants"]` | Handles rare words without losing common subparts |
+
+**WordPiece**, the algorithm used here, builds a vocabulary of frequent subword units from the training corpus. Words it has never seen can still be represented by combining known fragments. The `##` prefix marks a fragment that continues the previous token (i.e. it is not the start of a new word).
+
+Because the vocabulary is learned from your data, it naturally adapts to domain-specific vocabulary; in our case, French business descriptions full of technical terms.
 
 ::: {.callout-note appearance="simple" collapse="true"}
-## What is WordPiece?
-WordPiece is a **subword tokenization** algorithm. Rather than splitting on spaces (word-level)
-or individual characters, it finds a vocabulary of frequent subword units that can represent
-any word — including rare or unseen ones. For instance, *"informatiques"* might be split into
-`["informat", "##iques"]`. The `##` prefix indicates that the token is a continuation of the
-previous one. Because the vocabulary is built from your training corpus, it adapts well to
-domain-specific text like French business descriptions.
+## Want to go further?
+
+- The [Hugging Face tokenizer documentation](https://huggingface.co/docs/transformers/tokenizer_summary) gives a clear overview of the main tokenization strategies (BPE, WordPiece, Unigram).
+- The [Hugging Face tokenizers course chapter](https://huggingface.co/learn/nlp-course/chapter6/1) is a hands-on introduction for beginners.
 :::
 
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 3: Train a WordPiece tokenizer
 
-### Question 1 — Train the tokenizer and inspect a sample
+## Question 1 — Train the tokenizer and inspect a sample
 
 Train a `WordPieceTokenizer` from scratch on the training labels with `vocab_size=5000`
 and `output_dim=125`. Inspect a sample tokenization to understand how the text is split.
@@ -319,7 +358,7 @@ Key training hyperparameters:
 `torchTextClassifiers` provides a high-level wrapper that combines the tokenizer, model
 components, and training loop.
 
-### Question 1 — Instantiate the classifier
+## Question 1 — Instantiate the classifier
 
 Instantiate the classifier from a `ModelConfig` and the trained tokenizer.
 
@@ -358,7 +397,7 @@ model_config = ModelConfig(
 ttc = torchTextClassifiers(tokenizer=tokenizer, model_config=model_config)
 ```
 
-### Question 2 — Train on a small subsample
+## Question 2 — Train on a small subsample
 
 Define a `TrainingConfig` and train on a small subsample so it completes quickly.
 
@@ -411,13 +450,19 @@ ttc.train(
 )
 ```
 
-### Question 3 — Load the pretrained model from MLflow
+## Question 3 — Load the pretrained model from MLflow
 
 Load the **pretrained model** trained on the full dataset from MLflow.
 
 You can see the documentation on MLFlow Python API [here](https://mlflow.org/docs/latest/api_reference/python_api/index.html)
 
 *Use `mlflow.set_tracking_uri()` then `mlflow.artifacts.download_artifacts(f"runs:/{RUN_ID}/model_artifacts")`. Rebuild the model from `model_config.json` and restore weights with `load_state_dict()`.*
+
+<details>
+<summary>Clue here</summary>
+`mlflow.artifacts.download_artifacts` fetches all saved files locally. We rebuild the model
+architecture from `model_config.json` and restore the weights with `load_state_dict`.
+</details>
 
 ::: {.callout-note appearance="simple" collapse="true"}
 ## Note
@@ -479,12 +524,6 @@ ttc_full.pytorch_model.load_state_dict(
 ttc_full.pytorch_model.eval()
 ```
 
-<details>
-<summary>Clue here</summary>
-`mlflow.artifacts.download_artifacts` fetches all saved files locally. We rebuild the model
-architecture from `model_config.json` and restore the weights with `load_state_dict`.
-</details>
-
 :::
 
 # Prediction and explainability
@@ -496,16 +535,13 @@ words drove the prediction.
 
 ::: {.callout-important}
 ## On the interpretation of attention attributions
-Attention weights highlight which tokens the model focused on when predicting a class — but
-attention is **not** a faithful explanation of model decisions in all cases. High attention on
-a word means the model used it as a signal, not necessarily that it is the true cause of the
-prediction. Use these visualisations as an exploratory tool, not as a ground-truth explanation.
+Attention weights highlight which tokens the model focused on when predicting a class — but attention is **not** a faithful explanation of model decisions in all cases. High attention on a word means the model used it as a signal, not necessarily that it is the true cause of the prediction. Use these visualisations as an exploratory tool, not as a ground-truth explanation.
 :::
 
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 5: Generate predictions and inspect attributions
 
-### Question 1 — Generate top-3 predictions with confidence scores
+## Question 1 — Generate top-3 predictions with confidence scores
 
 Call `ttc_full.predict(np.array(example_texts), top_k=3, explain_with_label_attention=True)`. The result is a dict with keys `prediction` and `confidence` — decode integer predictions back to NAF codes using `saved_label_mapping[str(idx)]`.
 
@@ -535,7 +571,7 @@ for i, text in enumerate(example_texts):
         print(f"  {code}  (confidence: {conf:.3f})")
 ```
 
-### Question 2 — Visualise word attributions for the top prediction
+## Question 2 — Visualise word attributions for the top prediction
 
 Extract `label_attention_attributions` from the results, average over attention heads, then use `map_attributions_to_word()`, `map_attributions_to_char()`, `plot_attributions_at_word()`, and `plot_attributions_at_char()` from `torchTextClassifiers.utilities.plot_explainability`.
 
@@ -585,7 +621,7 @@ figshow(plot_attributions_at_word(
 )[0])
 ```
 
-### Question 3 — Evaluate accuracy on the test set
+## Question 3 — Evaluate accuracy on the test set
 
 Run `ttc_full.predict(X_test_small, top_k=1)` and compare the predictions against `y_test_small` to compute accuracy.
 
