@@ -595,7 +595,7 @@ treated as an exploratory tool rather than a definitive causal explanation.
 ## Question 1 — Generate top-5 predictions with confidence scores
 
 Sample some text from the `X_text` array in a variable called `example_texts`.
-Call `ttc.predict(np.array(example_texts), top_k=5, explain_with_captum=True)`. The result is a dict with keys `prediction`, `confidence` and `captum_attributions` among others.
+Call `ttc.predict(np.array(example_texts), top_k=5, explain_with_captum=True)`. The result is a dictionary with keys `prediction`, `confidence` and `captum_attributions` among others. Inspect the content of the dictionary. Do you understand what it contains?
 
 ```{python}
 #| label: predict-examples
