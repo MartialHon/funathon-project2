@@ -401,9 +401,9 @@ Key training hyperparameters:
 ::: {.callout-tip collapse="false" icon=false}
 ## `<i class="bi bi-book"></i>`{=html} Exercice 4: Train the model
 
-`torchTextClassifiers` provides a high-level wrapper that combines the value encoder, tokenizer, model components, and training loop. You will do two things: create a model, and then train the model. It is important to distinguish these two steps clearly.
+`torchTextClassifiers` provides a high-level wrapper that combines the value encoder, tokenizer, model components, and training loop. You will do two things: create a model, and then train the model. It is important to distinguish these two steps clearly. To do so, `torchTextClassifiers` offers two tools: `ModelConfig` defines the model and `TrainingConfig` defines the training process.
 
-## Question 1 — Instantiate the classifier
+## Question 1 — Create the classifier
 
 Using the `torchTextClassifiers` package, create a `ModelConfig`. Then create a `torchTextClassifiers` classifier that uses this `ModelConfig` and the trained tokenizer. Set the dimension of embeddings to 96. You will need to read carefully the [`torchTextClassifiers` documentation](https://inseefrlab.github.io/torchTextClassifiers/api/index.html).
 
@@ -440,11 +440,12 @@ ttc = torchTextClassifiers(
 
 ## Question 2 — Train on a small subsample
 
-Define a `TrainingConfig` and train on a small subsample so it completes quickly.
+Define a `TrainingConfig` and train on a small subsample so it completes quickly. You can see the `TrainingConfig` documentation [here](https://inseefrlab.github.io/torchTextClassifiers/api/configs.html#trainingconfig)
 
-*Create a `TrainingConfig(lr=..., batch_size=..., num_epochs=...)` and call `ttc.train(X_train=..., y_train=..., X_val=..., y_val=..., training_config=..., verbose=True)`.*
-
-You can see the `TrainingConfig` documentation [here](https://inseefrlab.github.io/torchTextClassifiers/api/configs.html#trainingconfig)
+<details>
+<summary>Clue here</summary>
+Create a `TrainingConfig(lr=..., batch_size=..., num_epochs=...)` and call `ttc.train(X_train=..., y_train=..., X_val=..., y_val=..., training_config=..., verbose=True)`.
+</details>
 
 ::: {.callout-note appearance="simple" collapse="true"}
 ## Note
