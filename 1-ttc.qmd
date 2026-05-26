@@ -301,11 +301,14 @@ The process has three steps:
 The diagram below illustrates this pipeline on a short example:
 
 ```{mermaid}
+%%| eval: true
+%%| output: true
 flowchart LR
-    A["\"I sell croissants\""] -->|"split into tokens"| B["[\"i\", \"sell\", \"croi\", \"##ssants\"]"]
+    A["#quot;I sell croissants#quot;"] -->|"split into tokens"| B["[#quot;i#quot;, #quot;sell#quot;, #quot;croi#quot;, #quot;##ssants#quot;]"]
     B -->|"look up in vocabulary"| C["[45, 112, 87, 203]"]
     C -->|"pad to length 6"| D["[45, 112, 87, 203, 0, 0]"]
 ```
+
 
 ## Why subword tokenization?
 
